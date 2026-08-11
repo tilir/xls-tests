@@ -1,5 +1,30 @@
-// Latency-independent testbench for the generated CRC-16/XMODEM proc network.
-// Runtime options: +verbose, +trace.
+// Self-checking, latency-independent testbench for the generated CRC-16/XMODEM
+// streaming proc.
+//
+// The DUT instantiated below is a simulation-only wrapper generated from the
+// XLS ModuleSignatureProto. It exposes stable channel-oriented names, keeping
+// this hand-written testbench independent of physical names such as `_input`
+// that codegen_main may choose for the actual RTL module. The wrapper is not
+// part of the Yosys synthesis target.
+//
+// The input channel payload is the packed DSLX Input struct: data occupies
+// bits [8:1] and last occupies bit [0]. Every accepted byte updates a
+// CRC-16/XMODEM accumulator initialized to zero. A byte with last=1 completes
+// the packet, emits its CRC on the output channel, and resets the accumulator
+// for the next packet.
+//
+// Stimulus and result checking are deliberately decoupled. The driver holds
+// valid and payload until an input ready/valid handshake. Packet results from
+// the independent reference model are queued, while the output monitor removes
+// and compares them only on an output handshake. Consequently the test does
+// not assume a particular codegen latency or combinational ready path.
+//
+// Covered scenarios are the standard "123456789" check vector, all 256
+// possible one-byte packets, output backpressure with stable valid/data, and
+// deterministic pseudo-random multi-byte packets. The shared watchdog turns a
+// handshake deadlock into a finite test failure.
+//
+// Runtime options: +verbose prints successful checks; +trace writes crc16.fst.
 module crc16_testbench;
   timeunit 1ns;
   timeprecision 1ps;
@@ -21,15 +46,17 @@ module crc16_testbench;
   int unsigned expected_count;
   int unsigned received_count;
 
-  crc16 dut (
-    .clk(clk),
-    .rst(rst),
-    ._input(input_data),
-    ._input_vld(input_vld),
-    ._output_rdy(output_rdy),
-    ._input_rdy(input_rdy),
-    ._output(output_data),
-    ._output_vld(output_vld)
+  // crc16_test_dut is generated in the build tree from
+  // crc16.signature.textproto; it contains wiring only.
+  crc16_test_dut dut (
+    .clock(clk),
+    .reset(rst),
+    .input_data(input_data),
+    .input_valid(input_vld),
+    .input_ready(input_rdy),
+    .output_data(output_data),
+    .output_valid(output_vld),
+    .output_ready(output_rdy)
   );
 
   tb_watchdog #(.MAX_CYCLES(10000)) watchdog (.clock(clk));
@@ -39,6 +66,7 @@ module crc16_testbench;
     forever #5 clk = ~clk;
   end
 
+  // Bit-serial reference model kept structurally independent of generated RTL.
   function automatic logic [15:0] crc16_byte_ref(
     input logic [15:0] crc,
     input logic [7:0] data
@@ -70,6 +98,8 @@ module crc16_testbench;
     endcase
   endfunction
 
+  // Fixed-size queue avoids relying on simulator-specific dynamic queue
+  // support while allowing input and output activity to proceed independently.
   task automatic expect_result(input logic [15:0] expected);
     if (expected_count == MAX_RESULTS)
       $fatal(1, "Expected-result queue overflow");
@@ -94,7 +124,7 @@ module crc16_testbench;
   endtask
 
   // Hold valid and payload until the DUT accepts the transfer. No assumption
-  // is made about ready latency or the generated FIFO implementation.
+  // is made about ready latency or internal buffering.
   task automatic send_byte(input logic [7:0] data, input logic last);
     @(negedge clk);
     input_data = {data, last};

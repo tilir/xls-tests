@@ -66,6 +66,7 @@ function(xls_add_dslx target)
   set(ir "${output_dir}/${XLS_OUTPUT_NAME}.ir")
   set(opt_ir "${output_dir}/${XLS_OUTPUT_NAME}.opt.ir")
   set(verilog "${output_dir}/${XLS_OUTPUT_NAME}.sv")
+  set(signature "${output_dir}/${XLS_OUTPUT_NAME}.signature.textproto")
 
   add_custom_command(
     OUTPUT "${ir}"
@@ -86,7 +87,7 @@ function(xls_add_dslx target)
     VERBATIM)
 
   add_custom_command(
-    OUTPUT "${verilog}"
+    OUTPUT "${verilog}" "${signature}"
     COMMAND "${XLS_CODEGEN_MAIN}"
             "--generator=${XLS_GENERATOR}"
             "--delay_model=${XLS_DELAY_MODEL}"
@@ -94,6 +95,7 @@ function(xls_add_dslx target)
             "--reset=${XLS_RESET}"
             --use_system_verilog
             "--output_verilog_path=${verilog}"
+            "--output_signature_path=${signature}"
             ${XLS_CODEGEN_ARGS}
             "${opt_ir}"
     DEPENDS "${opt_ir}"
@@ -102,4 +104,5 @@ function(xls_add_dslx target)
 
   add_custom_target("${target}" ALL DEPENDS "${verilog}")
   set_property(TARGET "${target}" PROPERTY XLS_VERILOG_OUTPUT "${verilog}")
+  set_property(TARGET "${target}" PROPERTY XLS_SIGNATURE_OUTPUT "${signature}")
 endfunction()

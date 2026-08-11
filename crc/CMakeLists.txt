@@ -12,6 +12,7 @@ if(BUILD_TESTING)
   xls_add_sv_test(crc16_test
     RTL_TARGET crc16
     TOP crc16_testbench
+    WRAPPER_MODULE crc16_test_dut
     SOURCES
       "${CMAKE_SOURCE_DIR}/utils/tb_util.sv"
       "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"

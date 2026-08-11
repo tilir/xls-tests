@@ -3,6 +3,7 @@ include_guard(GLOBAL)
 find_program(VERILATOR_EXECUTABLE verilator)
 find_program(IVERILOG_EXECUTABLE iverilog)
 find_program(VVP_EXECUTABLE vvp)
+find_program(RUBY_EXECUTABLE ruby REQUIRED)
 
 if(VERILATOR_EXECUTABLE)
   message(STATUS "Verilator tests: ${VERILATOR_EXECUTABLE}")
@@ -19,7 +20,7 @@ endif()
 # Compile and register a self-checking SV testbench against generated XLS RTL.
 function(xls_add_sv_test name)
   set(options)
-  set(one_value_args RTL_TARGET TOP)
+  set(one_value_args RTL_TARGET TOP WRAPPER_MODULE)
   set(multi_value_args SOURCES)
   cmake_parse_arguments(SV "${options}" "${one_value_args}"
                         "${multi_value_args}" ${ARGN})
@@ -45,6 +46,28 @@ function(xls_add_sv_test name)
                            BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     list(APPEND sources "${source_abs}")
   endforeach()
+
+  if(SV_WRAPPER_MODULE)
+    get_property(signature TARGET "${SV_RTL_TARGET}"
+                 PROPERTY XLS_SIGNATURE_OUTPUT)
+    if(NOT signature)
+      message(FATAL_ERROR
+        "Target ${SV_RTL_TARGET} has no XLS module signature")
+    endif()
+    set(wrapper "${CMAKE_CURRENT_BINARY_DIR}/${name}_dut_wrapper.sv")
+    set(wrapper_generator
+        "${CMAKE_SOURCE_DIR}/utils/generate_sv_wrapper.rb")
+    add_custom_command(
+      OUTPUT "${wrapper}"
+      COMMAND "${RUBY_EXECUTABLE}" "${wrapper_generator}"
+              --signature "${signature}"
+              --output "${wrapper}"
+              --module "${SV_WRAPPER_MODULE}"
+      DEPENDS "${signature}" "${wrapper_generator}" "${SV_RTL_TARGET}"
+      COMMENT "Generate ${SV_WRAPPER_MODULE} from XLS module signature"
+      VERBATIM)
+    list(APPEND sources "${wrapper}")
+  endif()
 
   set(sim_targets)
 

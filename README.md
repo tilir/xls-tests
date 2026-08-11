@@ -2,7 +2,8 @@
 
 Each experiment has its own subdirectory and `CMakeLists.txt`. Register a new
 experiment explicitly with `add_subdirectory(name)` in the root
-`CMakeLists.txt`. Generated IR and SystemVerilog are written to the build tree.
+`CMakeLists.txt`. Generated IR, SystemVerilog, and the XLS module signature are
+written to the build tree.
 
 Configure and build everything:
 
@@ -49,11 +50,17 @@ for generated RTL with:
 xls_add_sv_test(example_test
   RTL_TARGET example
   TOP example_testbench
+  WRAPPER_MODULE example_test_dut
   SOURCES
     "${CMAKE_SOURCE_DIR}/utils/tb_util.sv"
     "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"
     example_testbench.sv)
 ```
+
+`WRAPPER_MODULE` generates a simulation-only adapter from the XLS module
+signature. Testbenches use stable `<channel>_data`, `<channel>_valid`, and
+`<channel>_ready` ports instead of depending on XLS-generated port names. The
+adapter is not included in Yosys synthesis.
 
 ## Yosys synthesis
 
