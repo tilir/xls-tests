@@ -1,6 +1,3 @@
 /build*/
 /.cache/
-*.ir
-*.opt.ir
-*.sv
 compile_commands.json

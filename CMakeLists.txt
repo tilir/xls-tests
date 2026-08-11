@@ -9,5 +9,15 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Xls)
+include(CTest)
+include(SvTest)
+
+if(BUILD_TESTING)
+  add_custom_target(check
+    COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    COMMENT "Run SystemVerilog tests"
+    USES_TERMINAL)
+endif()
 
 add_subdirectory(crc)
