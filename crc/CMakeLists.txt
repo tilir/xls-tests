@@ -4,6 +4,10 @@ xls_add_dslx(crc16
   OUTPUT_NAME crc16
   CODEGEN_ARGS --module_name=crc16)
 
+add_yosys_synth(crc16
+  RTL_TARGET crc16
+  TOP crc16)
+
 if(BUILD_TESTING)
   xls_add_sv_test(crc16_test
     RTL_TARGET crc16

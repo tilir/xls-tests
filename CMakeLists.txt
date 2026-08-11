@@ -11,6 +11,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Xls)
 include(CTest)
 include(SvTest)
+include(YosysSynth)
 
 if(BUILD_TESTING)
   add_custom_target(check

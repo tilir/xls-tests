@@ -1,10 +1,12 @@
-// Self-checking testbench for the generated CRC-16/XMODEM streaming proc.
+// Latency-independent testbench for the generated CRC-16/XMODEM proc network.
 // Runtime options: +verbose, +trace.
 module crc16_testbench;
   timeunit 1ns;
   timeprecision 1ps;
 
   import tb_util_pkg::*;
+
+  localparam int MAX_RESULTS = 1024;
 
   logic        clk;
   logic        rst;
@@ -14,6 +16,10 @@ module crc16_testbench;
   logic        input_rdy;
   logic [15:0] output_data;
   logic        output_vld;
+
+  logic [15:0] expected_results [0:MAX_RESULTS-1];
+  int unsigned expected_count;
+  int unsigned received_count;
 
   crc16 dut (
     .clk(clk),
@@ -26,7 +32,7 @@ module crc16_testbench;
     ._output_vld(output_vld)
   );
 
-  tb_watchdog #(.MAX_CYCLES(5000)) watchdog (.clock(clk));
+  tb_watchdog #(.MAX_CYCLES(10000)) watchdog (.clock(clk));
 
   initial begin
     clk = 0;
@@ -64,91 +70,109 @@ module crc16_testbench;
     endcase
   endfunction
 
+  task automatic expect_result(input logic [15:0] expected);
+    if (expected_count == MAX_RESULTS)
+      $fatal(1, "Expected-result queue overflow");
+    expected_results[expected_count] = expected;
+    expected_count = expected_count + 1;
+  endtask
+
+  task automatic wait_for_results(input int unsigned target_count);
+    while (received_count < target_count)
+      @(posedge clk);
+  endtask
+
   task automatic reset_dut;
     @(negedge clk);
     rst = 1;
     input_vld = 0;
     output_rdy = 0;
-    repeat (2) @(posedge clk);
+    repeat (3) @(posedge clk);
     @(negedge clk);
     rst = 0;
+    output_rdy = 1;
   endtask
 
-  task automatic send_byte(input logic [7:0] data,
-                           input logic last,
-                           input logic [15:0] expected_crc);
+  // Hold valid and payload until the DUT accepts the transfer. No assumption
+  // is made about ready latency or the generated FIFO implementation.
+  task automatic send_byte(input logic [7:0] data, input logic last);
     @(negedge clk);
     input_data = {data, last};
     input_vld = 1;
-    output_rdy = 1;
-    #1;
-    check("input.ready", input_rdy, 1, 1,
-          $sformatf("data=%02h last=%0b", data, last));
-    check("output.valid", output_vld, last, 1,
-          $sformatf("data=%02h last=%0b", data, last));
-    if (last)
-      check("output.crc", output_data, expected_crc, 16,
-            $sformatf("final data=%02h", data));
-    @(posedge clk);
+    do begin
+      @(posedge clk);
+    end while (!input_rdy);
     @(negedge clk);
     input_vld = 0;
-    output_rdy = 0;
   endtask
 
   task automatic test_known_vector;
     logic [15:0] expected;
+    int unsigned target_count;
     begin_test("123456789 check vector");
     expected = 0;
     for (int index = 0; index < 9; ++index) begin
       expected = crc16_byte_ref(expected, check_vector_byte(index));
-      send_byte(check_vector_byte(index), index == 8, expected);
+      if (index == 8)
+        expect_result(expected);
+      send_byte(check_vector_byte(index), index == 8);
     end
-    check("known.crc", expected, 16'h31c3, 16,
+    target_count = expected_count;
+    wait_for_results(target_count);
+    check("known.reference", expected, 16'h31c3, 16,
           "independent CRC-16/XMODEM reference");
     end_test("123456789 check vector");
   endtask
 
   task automatic test_single_byte_packets;
     logic [15:0] expected;
+    int unsigned target_count;
     begin_test("single-byte packets");
     for (int data = 0; data < 256; ++data) begin
       expected = crc16_byte_ref(0, 8'(data));
-      send_byte(8'(data), 1, expected);
+      expect_result(expected);
+      send_byte(8'(data), 1);
     end
+    target_count = expected_count;
+    wait_for_results(target_count);
     end_test("single-byte packets");
   endtask
 
   task automatic test_backpressure;
     logic [15:0] expected;
+    logic [15:0] stalled_data;
+    int unsigned target_count;
     begin_test("output backpressure");
     expected = crc16_byte_ref(0, 8'ha5);
+    expect_result(expected);
 
     @(negedge clk);
+    output_rdy = 0;
     input_data = {8'ha5, 1'b1};
     input_vld = 1;
-    output_rdy = 0;
-    #1;
-    check("stalled.ready", input_rdy, 0, 1, "consumer is not ready");
-    check("stalled.valid", output_vld, 1, 1, "result remains valid");
-    check("stalled.crc", output_data, expected, 16, "result while stalled");
+    while (!output_vld)
+      @(posedge clk);
+
+    @(negedge clk);
+    stalled_data = output_data;
     repeat (3) begin
       @(posedge clk);
       #1;
-      check("stalled.crc", output_data, expected, 16, "state held");
+      check("stalled.valid", output_vld, 1, 1,
+            "valid remains asserted under backpressure");
+      check("stalled.data", output_data, stalled_data, 16,
+            "data remains stable under backpressure");
     end
 
     @(negedge clk);
     output_rdy = 1;
-    #1;
-    check("released.ready", input_rdy, 1, 1, "consumer became ready");
-    check("released.crc", output_data, expected, 16, "accepted result");
-    @(posedge clk);
+    do begin
+      @(posedge clk);
+    end while (!input_rdy);
     @(negedge clk);
     input_vld = 0;
-    output_rdy = 0;
-
-    expected = crc16_byte_ref(0, 8'h5a);
-    send_byte(8'h5a, 1, expected);
+    target_count = expected_count;
+    wait_for_results(target_count);
     end_test("output backpressure");
   endtask
 
@@ -157,6 +181,7 @@ module crc16_testbench;
     logic [7:0] data;
     int packet_length;
     int unsigned seed;
+    int unsigned target_count;
     begin_test("random packets");
     seed = 32'hc0decafe;
     void'($urandom(seed));
@@ -166,19 +191,39 @@ module crc16_testbench;
       for (int index = 0; index < packet_length; ++index) begin
         data = 8'($urandom);
         expected = crc16_byte_ref(expected, data);
-        send_byte(data, index == packet_length - 1, expected);
+        if (index == packet_length - 1)
+          expect_result(expected);
         if (($urandom % 3) == 0)
           @(posedge clk);
+        send_byte(data, index == packet_length - 1);
       end
     end
+    target_count = expected_count;
+    wait_for_results(target_count);
     end_test("random packets");
   endtask
+
+  // Output timing is intentionally decoupled from the stimulus. Only a
+  // ready/valid transfer causes a comparison with the expected-result queue.
+  always @(posedge clk) begin
+    if (!rst && output_vld && output_rdy) begin
+      if (received_count >= expected_count) begin
+        check("output.unexpected", 1, 0, 1, "no queued result");
+      end else begin
+        check("output.crc", output_data, expected_results[received_count], 16,
+              $sformatf("result %0d", received_count));
+      end
+      received_count <= received_count + 1;
+    end
+  end
 
   initial begin
     rst = 0;
     input_data = 0;
     input_vld = 0;
     output_rdy = 0;
+    expected_count = 0;
+    received_count = 0;
     init_tests();
 
     if ($test$plusargs("trace")) begin

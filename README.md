@@ -54,3 +54,26 @@ xls_add_sv_test(example_test
     "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"
     example_testbench.sv)
 ```
+
+## Yosys synthesis
+
+When Yosys is available, synthesize all registered implementations or only the
+generated CRC module with:
+
+```sh
+cmake --build build --target synth
+cmake --build build --target synth_crc16
+```
+
+Artifacts are written under `build/crc/synth/crc16/`: the structural Verilog
+and JSON netlists, a complete Yosys log, and statistics in human-readable and
+JSON formats. The flow uses `synth -flatten` so independently registered
+implementations can be compared consistently.
+
+Handwritten RTL can use the same synthesis flow:
+
+```cmake
+add_yosys_synth(crc16_handwritten
+  TOP crc16_handwritten
+  SOURCES crc16_handwritten.sv)
+```
