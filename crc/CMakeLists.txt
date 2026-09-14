@@ -1,94 +1,27 @@
-xls_add_dslx(crc16
-  SOURCE crc_temporal.x
-  TOP Crc16
-  OUTPUT_NAME crc16
-  GENERATOR pipeline
-  CODEGEN_ARGS --module_name=crc16)
-
-add_yosys_synth(crc16
-  RTL_TARGET crc16
-  TOP crc16)
-
-if(BUILD_TESTING)
-  xls_add_sv_test(crc16_test
-    RTL_TARGET crc16
-    TOP crc16_testbench
-    WRAPPER_MODULE crc16_test_dut
-    SOURCES
-      "${CMAKE_SOURCE_DIR}/utils/tb_util.sv"
-      "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"
-      crc16_testbench.sv)
+# Explicit scheduling budget for every pipeline (asap7 estimate, not STA).
+set(CRC_CLOCK_PERIOD_PS "2000" CACHE STRING "CRC pipeline clock period in picoseconds")
+if(NOT CRC_CLOCK_PERIOD_PS MATCHES "^[1-9][0-9]*$")
+  message(FATAL_ERROR "CRC_CLOCK_PERIOD_PS must be a positive integer (picoseconds)")
 endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/Targets.cmake")
 
-# Preserve crc16 as the existing streaming pipeline target.
-add_custom_target(crc16_temporal_pipeline DEPENDS crc16)
+# Functions: each registration owns RTL, synthesis, and tests for both generators.
+crc_add_function(crc16_function crc_function.x crc16_byte WIDTH 8)
+crc_add_function(crc16_naive_128 crc_naive_128.x crc16_block WIDTH 128)
+crc_add_function(crc16_optimized_128 crc_optimized_128.x crc16_block WIDTH 128)
 
-xls_add_dslx(crc16_temporal_combinational
-  SOURCE crc_temporal.x
-  TOP crc16_tick
-  GENERATOR combinational
-  CODEGEN_ARGS --module_name=crc16_temporal_combinational)
-add_yosys_synth(crc16_temporal_combinational
-  RTL_TARGET crc16_temporal_combinational
-  TOP crc16_temporal_combinational)
+# Procs require pipeline generation; temporal also exposes a pure transition.
+crc_add_proc(crc16 crc_temporal.x Crc16)
+crc_add_function(crc16_temporal crc_temporal.x crc16_tick
+  WIDTH 8 KIND tick GENERATORS combinational)
+crc_add_proc(crc16_sequential_128 crc_sequential_128.x Crc16Sequential128)
 
-foreach(generator IN ITEMS pipeline combinational)
-  set(target crc16_function_${generator})
-  xls_add_dslx(${target}
-    SOURCE crc_function.x
-    TOP crc16_byte
-    GENERATOR ${generator}
-    CODEGEN_ARGS --module_name=${target})
-  add_yosys_synth(${target} RTL_TARGET ${target} TOP ${target})
+# Historical public names retained for existing build commands.
+crc_alias(crc16_temporal_pipeline crc16)
+crc_alias(synth_crc16_temporal_pipeline synth_crc16)
+foreach(variant IN ITEMS naive optimized)
+  foreach(suffix IN ITEMS sim verilator iverilog)
+    crc_alias(crc16_${variant}_128_test_${suffix}
+      crc16_${variant}_128_combinational_test_${suffix})
+  endforeach()
 endforeach()
-
-xls_add_dslx(crc16_naive_128_combinational
-  SOURCE crc_naive_128.x
-  TOP crc16_block
-  GENERATOR combinational
-  CODEGEN_ARGS --module_name=crc16_naive_128_combinational)
-add_yosys_synth(crc16_naive_128_combinational
-  RTL_TARGET crc16_naive_128_combinational
-  TOP crc16_naive_128_combinational)
-
-if(BUILD_TESTING)
-  xls_add_sv_test(crc16_naive_128_test
-    RTL_TARGET crc16_naive_128_combinational
-    TOP crc16_naive_128_testbench
-    SOURCES crc16_naive_128_testbench.sv)
-endif()
-
-xls_add_dslx(crc16_optimized_128_combinational
-  SOURCE crc_optimized_128.x
-  TOP crc16_block
-  GENERATOR combinational
-  CODEGEN_ARGS --module_name=crc16_optimized_128_combinational)
-add_yosys_synth(crc16_optimized_128_combinational
-  RTL_TARGET crc16_optimized_128_combinational
-  TOP crc16_optimized_128_combinational)
-
-if(BUILD_TESTING)
-  xls_add_sv_test(crc16_optimized_128_test
-    RTL_TARGET crc16_optimized_128_combinational
-    TOP crc16_optimized_128_testbench
-    SOURCES crc16_naive_128_testbench.sv)
-endif()
-
-xls_add_dslx(crc16_sequential_128
-  SOURCE crc_sequential_128.x
-  TOP Crc16Sequential128
-  GENERATOR pipeline
-  CODEGEN_ARGS --module_name=crc16_sequential_128)
-add_yosys_synth(crc16_sequential_128
-  RTL_TARGET crc16_sequential_128
-  TOP crc16_sequential_128)
-
-if(BUILD_TESTING)
-  xls_add_sv_test(crc16_sequential_128_test
-    RTL_TARGET crc16_sequential_128
-    TOP crc16_sequential_128_testbench
-    WRAPPER_MODULE crc16_sequential_128_test_dut
-    SOURCES
-      "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"
-      crc16_sequential_128_testbench.sv)
-endif()

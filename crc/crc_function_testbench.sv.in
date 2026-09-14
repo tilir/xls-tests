@@ -1,0 +1,95 @@
+// Generated test configuration; stimulus and reference are shared by all functions.
+module crc_function_testbench;
+  timeunit 1ns;
+  timeprecision 1ps;
+  localparam int WIDTH = @WIDTH@;
+  localparam int OUT_WIDTH = @OUT_WIDTH@;
+  localparam int LATENCY = @LATENCY@;
+  logic clk = 0;
+  always #5 clk = ~clk;
+  logic rst = 1;
+  logic [15:0] crc = 0;
+  logic [WIDTH-1:0] data = 0;
+  logic last = 0;
+  wire [OUT_WIDTH-1:0] out;
+  logic [OUT_WIDTH-1:0] expected [0:LATENCY];
+  logic [15:0] reference = 0;
+  logic [31:0] rng = 32'h12345678;
+  int filled = 0;
+  int checked = 0;
+  @DUT@
+
+  function automatic logic [15:0] reference_crc(
+    input logic [15:0] initial_crc, input logic [WIDTH-1:0] block_data
+  );
+    logic [15:0] result;
+    logic feedback;
+    result = initial_crc;
+    for (int i = WIDTH-1; i >= 0; --i) begin
+      feedback = result[15] ^ block_data[i];
+      result = result << 1;
+      if (feedback) result ^= 16'h1021;
+    end
+    return result;
+  endfunction
+
+  // One new input each clock; compare against the signature's pipeline latency.
+  task automatic step(input logic [15:0] c, input logic [WIDTH-1:0] d, input logic l);
+    @(negedge clk);
+    crc = c;
+    data = d;
+    last = l;
+    reference = reference_crc(c, d);
+    if (LATENCY == 0) begin
+      #1;
+      if (out !== @EXPECTED@) $fatal(1, "combinational mismatch at %0d", checked);
+      checked++;
+    end else begin
+      @(posedge clk);
+      for (int i = LATENCY; i > 0; --i) expected[i] = expected[i-1];
+      expected[0] = @EXPECTED@;
+      filled++;
+      #1;
+      if (filled >= LATENCY) begin
+        if (out !== expected[LATENCY-1]) $fatal(1, "pipeline mismatch at %0d", checked);
+        checked++;
+      end
+    end
+  endtask
+
+  task automatic reset_dut;
+    @(negedge clk);
+    rst = 1;
+    repeat(3) @(negedge clk);
+    rst = 0;
+    filled = 0;
+  endtask
+
+  initial begin
+    reset_dut();
+    for (int phase = 0; phase < 2; ++phase) begin
+      step(0, '0, 0);
+      step('1, '1, 1);
+      for (int i = 0; i < WIDTH+16; ++i) begin
+        step(i >= WIDTH ? (16'b1 << (i-WIDTH)) : 16'b0,
+             i < WIDTH ? ({{(WIDTH-1){1'b0}}, 1'b1} << i) : '0, 0);
+        step(i >= WIDTH ? (16'b1 << (i-WIDTH)) : 16'b0,
+             i < WIDTH ? ({{(WIDTH-1){1'b0}}, 1'b1} << i) : '0, 1);
+      end
+      for (int i = 0; i < 512; ++i) begin
+        for (int j = 0; j < WIDTH; ++j) begin
+          rng ^= rng << 13;
+          rng ^= rng >> 17;
+          rng ^= rng << 5;
+          data[j] = rng[0];
+        end
+        step(reference, data, 1'(i));
+      end
+      // Reset with results still in flight; restart the reference queue.
+      if (phase == 0) reset_dut();
+    end
+    repeat(LATENCY) step(0, '0, 0);
+    $display("PASS: %0d results, width=%0d latency=%0d", checked, WIDTH, LATENCY);
+    $finish;
+  end
+endmodule

@@ -64,6 +64,7 @@ function(xls_add_sv_test name)
               --output "${wrapper}"
               --module "${SV_WRAPPER_MODULE}"
       DEPENDS "${signature}" "${wrapper_generator}" "${SV_RTL_TARGET}"
+              "${CMAKE_SOURCE_DIR}/utils/xls_signature.rb"
       COMMENT "Generate ${SV_WRAPPER_MODULE} from XLS module signature"
       VERBATIM)
     list(APPEND sources "${wrapper}")

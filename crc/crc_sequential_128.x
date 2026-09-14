@@ -20,6 +20,8 @@ proc Crc16Sequential128 {
   output: chan<u16> out;
 
   config(input: chan<Input> in, output: chan<u16> out) {
+    const_assert!(STEP_BITS > u32:0 && STEP_BITS < u32:128);
+    const_assert!(u32:128 % STEP_BITS == u32:0);
     (input, output)
   }
 
