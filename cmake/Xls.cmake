@@ -86,13 +86,21 @@ function(xls_add_dslx target)
     COMMENT "Optimizing ${XLS_OUTPUT_NAME}.ir"
     VERBATIM)
 
+  set(generator_args)
+  if(XLS_GENERATOR STREQUAL "pipeline")
+    list(APPEND generator_args
+      "--delay_model=${XLS_DELAY_MODEL}"
+      "--clock_period_ps=${XLS_CLOCK_PERIOD_PS}"
+      "--reset=${XLS_RESET}")
+  elseif(NOT XLS_GENERATOR STREQUAL "combinational")
+    message(FATAL_ERROR "Unsupported XLS generator: ${XLS_GENERATOR}")
+  endif()
+
   add_custom_command(
     OUTPUT "${verilog}" "${signature}"
     COMMAND "${XLS_CODEGEN_MAIN}"
             "--generator=${XLS_GENERATOR}"
-            "--delay_model=${XLS_DELAY_MODEL}"
-            "--clock_period_ps=${XLS_CLOCK_PERIOD_PS}"
-            "--reset=${XLS_RESET}"
+            ${generator_args}
             --use_system_verilog
             "--output_verilog_path=${verilog}"
             "--output_signature_path=${signature}"

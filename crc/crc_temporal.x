@@ -24,6 +24,14 @@ fn crc16_byte(crc: u16, data: u8) -> u16 {
   }(crc)
 }
 
+// Combinational transition of Crc16. The caller stores next_crc and uses
+// output_valid to decide whether output_crc completes a packet.
+pub fn crc16_tick(crc: u16, byte_input: Input) -> (u16, u16, bool) {
+  let output_crc = crc16_byte(crc, byte_input.data);
+  let next_crc = if byte_input.last { u16:0 } else { output_crc };
+  (next_crc, output_crc, byte_input.last)
+}
+
 proc Crc16 {
   input: chan<Input> in;
   output: chan<u16> out;
@@ -38,13 +46,8 @@ proc Crc16 {
     let tok = join();
     let (tok, input) = recv(tok, input);
 
-    let next_crc = crc16_byte(crc, input.data);
-    let tok = send_if(tok, output, input.last, next_crc);
-
-    if input.last {
-      u16:0
-    } else {
-      next_crc
-    }
+    let (next_crc, output_crc, output_valid) = crc16_tick(crc, input);
+    let tok = send_if(tok, output, output_valid, output_crc);
+    next_crc
   }
 }
