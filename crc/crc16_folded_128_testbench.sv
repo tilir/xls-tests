@@ -1,4 +1,4 @@
-module crc16_sequential_128_testbench;
+module crc16_folded_128_testbench;
   timeunit 1ns;
   timeprecision 1ps;
   logic clk = 0;
@@ -15,7 +15,7 @@ module crc16_sequential_128_testbench;
   logic [15:0] initial_crc, expected, held;
   int cycles;
 
-  crc16_sequential_128_test_dut dut(
+  crc16_folded_128_test_dut dut(
     .clock(clk), .reset(rst),
     .input_data(input_data), .input_valid(input_valid), .input_ready(input_ready),
     .output_data(output_data), .output_valid(output_valid), .output_ready(output_ready)
@@ -116,7 +116,7 @@ module crc16_sequential_128_testbench;
       @(negedge clk);
       if (output_valid) $fatal(1, "duplicate output");
     end
-    $display("PASS: 302 sequential CRC blocks, reset, input and output backpressure");
+    $display("PASS: 302 folded CRC blocks, reset, input and output backpressure");
     $finish;
   end
 endmodule

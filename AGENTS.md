@@ -18,7 +18,7 @@ crc/Targets.cmake. Register RTL, synthesis, and tests together.
 
 ```cmake
 crc_add_function(crc16_naive_128 crc_naive_128.x crc16_block WIDTH 128)
-crc_add_proc(crc16_sequential_128 crc_sequential_128.x Crc16Sequential128)
+crc_add_proc(crc16_folded_128 crc_folded_128.x Crc16Folded128)
 ```
 
 `crc_add_function` creates pipeline and combinational variants, their `synth_`
@@ -51,6 +51,59 @@ delay model. Combinational generation receives no clock-period, delay-model, or
 reset flags. The scheduling period is not a Yosys timing constraint or an STA
 result.
 
+## Complete CRC build mapping
+
+Keep this table synchronized with crc/CMakeLists.txt. Source paths below are
+relative to crc/. Each row is a distinct RTL module; aliases do not create
+additional implementations.
+
+| DSLX source | Entry point | Generator | Build target / RTL module | Result |
+| --- | --- | --- | --- | --- |
+| `crc_naive_128.x` | `fn crc16_block` | `pipeline` | `crc16_naive_128_pipeline` | Pipelined 128-bit update from the naive loop |
+| `crc_naive_128.x` | `fn crc16_block` | `combinational` | `crc16_naive_128_combinational` | Entire 128-bit update without registers |
+| `crc_optimized_128.x` | `fn crc16_block` | `pipeline` | `crc16_optimized_128_pipeline` | Pipelined 128-bit update from the shared XOR network |
+| `crc_optimized_128.x` | `fn crc16_block` | `combinational` | `crc16_optimized_128_combinational` | Shared 128-bit XOR network without registers |
+| `crc_temporal.x` | `proc Crc16` | `pipeline` | `crc16` | Byte-stream channels, internal CRC accumulator, result and accumulator clear on `last` |
+| `crc_temporal.x` | `fn crc16_tick` | `combinational` | `crc16_temporal_combinational` | `(crc, byte_input) -> (next_crc, output_crc, output_valid)`; caller owns state and handshake |
+| `crc_folded_128.x` | `proc Crc16Folded128` | `pipeline` | `crc16_folded_128` | Channels accept initial CRC and 128-bit block; internal state processes 16 bits per step, then emits CRC |
+
+For every canonical target `T` in the table:
+
+| Artifact or action | Path / target / CTest name |
+| --- | --- |
+| Unoptimized IR | `build/crc/T.ir` |
+| Optimized IR | `build/crc/T.opt.ir` |
+| SystemVerilog | `build/crc/T.sv` (module name `T`) |
+| XLS signature | `build/crc/T.signature.textproto` |
+| Yosys synthesis target | `synth_T` |
+| Synthesis artifacts | `build/crc/synth/T/` |
+| Build all available simulators | `T_test_sim` |
+| Build Verilator / Icarus image | `T_test_verilator` / `T_test_iverilog` |
+| Run via CTest | `T_test.verilator` / `T_test.iverilog` |
+
+Here `T` is a placeholder, not a literal filename. Synthesis targets require
+Yosys; simulation targets require BUILD_TESTING and the corresponding installed
+simulator. Pipeline latency comes from the signature and depends on
+CRC_CLOCK_PERIOD_PS. A proc signature's pipeline latency does not describe its
+whole packet/block processing time.
+
+Compatibility aliases resolve as follows:
+
+| Alias | Canonical target |
+| --- | --- |
+| `crc16_temporal_pipeline` | `crc16` |
+| `synth_crc16_temporal_pipeline` | `synth_crc16` |
+| `crc16_naive_128_test_sim` | `crc16_naive_128_combinational_test_sim` |
+| `crc16_naive_128_test_verilator` | `crc16_naive_128_combinational_test_verilator` |
+| `crc16_naive_128_test_iverilog` | `crc16_naive_128_combinational_test_iverilog` |
+| `crc16_optimized_128_test_sim` | `crc16_optimized_128_combinational_test_sim` |
+| `crc16_optimized_128_test_verilator` | `crc16_optimized_128_combinational_test_verilator` |
+| `crc16_optimized_128_test_iverilog` | `crc16_optimized_128_combinational_test_iverilog` |
+
+In particular, the temporal pipeline RTL is `build/crc/crc16.sv`, not
+`build/crc/crc16_temporal_pipeline.sv`. There is no folded combinational
+variant and no pipeline variant of `crc16_tick` in the current registrations.
+
 ## Tests
 
 Function variants share crc/crc_function_testbench.sv.in.
@@ -61,7 +114,7 @@ and chained CRCs, and resets with results in flight. The temporal transition
 also checks both values of last and the returned state.
 
 Proc tests exercise reference CRCs, channel backpressure, and packet/block
-handling; the sequential test includes reset during processing. Channel wrappers
+handling; the folded test includes reset during processing. Channel wrappers
 come from utils/generate_sv_wrapper.rb. Shared signature parsing helpers live in
 utils/xls_signature.rb; CMake dependencies must include them when generating
 wrappers or tests. Simulation adapters are excluded from synthesis.
@@ -91,12 +144,12 @@ are historical, not constants to maintain in README.
 
 ## CRC implementation notes
 
-The byte function's DSLX loop is unrolled by XLS. Replacing manually repeated
-steps with that loop preserved the synthesized circuit and was checked for
-equivalence. Sixteen byte updates were also checked algebraically against the
-naive 128-bit function for all input CRC/data combinations.
+The standalone byte-function experiment was removed: byte processing remains
+inside crc_temporal.x, while the standalone function experiments process full
+128-bit blocks. The shared function testbench still covers both block
+implementations and the temporal transition. There are seven RTL variants.
 
-The sequential proc uses STEP_BITS=16, processing eight chunks per block. Its
+The folded proc uses STEP_BITS=16, processing eight chunks per block. Its
 initial CRC comes from the input transaction; it does not automatically carry
 the result between blocks. const_assert checks in config require STEP_BITS to
 be positive, smaller than 128, and a divisor of 128. Keep these checks: a
@@ -144,7 +197,7 @@ Re-measure after relevant source or tool changes.
 
 The shared network traded about 14% more cells for lower depth.
 
-Sequential STEP_BITS sweep with asap7 scheduling at 2000 ps:
+Folded STEP_BITS sweep with asap7 scheduling at 2000 ps:
 
 | Bits/step | Steps/block | Cells | Flip-flops | Gate levels between sequential boundaries |
 | ---: | ---: | ---: | ---: | ---: |

@@ -15,7 +15,7 @@ struct State {
   remaining: u7,
 }
 
-proc Crc16Sequential128 {
+proc Crc16Folded128 {
   input: chan<Input> in;
   output: chan<u16> out;
 

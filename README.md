@@ -27,13 +27,11 @@ Configure with `-DBUILD_TESTING=OFF` to build without simulation tests.
 
 | Target | Operation |
 | --- | --- |
-| `crc16_function_pipeline` | One-byte CRC update, pipelined |
-| `crc16_function_combinational` | One-byte CRC update, combinational |
 | `crc16_naive_128_pipeline` | 128-bit block, pipelined |
 | `crc16_naive_128_combinational` | 128-bit block, combinational |
 | `crc16_optimized_128_pipeline` | 128-bit block using an optimized XOR network, pipelined |
 | `crc16_optimized_128_combinational` | Same XOR network, combinational |
-| `crc16_sequential_128` | 128-bit block through ready/valid channels, 16 bits per processing step |
+| `crc16_folded_128` | 128-bit block through ready/valid channels, 16 bits per processing step |
 | `crc16_temporal_pipeline` (alias `crc16`) | Byte stream with internal CRC state and packet boundaries |
 | `crc16_temporal_combinational` | One byte-stream state transition, with external state |
 
@@ -50,7 +48,7 @@ The function variants take an initial CRC and data, and return the updated CRC.
 Use zero for a new message; pass the previous result to continue it. Pipeline
 latency is recorded in each generated `.signature.textproto` file.
 
-`crc16_sequential_128` accepts `{crc: u16, data: uN[128]}` and returns a CRC16
+`crc16_folded_128` accepts `{crc: u16, data: uN[128]}` and returns a CRC16
 through ready/valid channels. It processes one block in eight steps; stalls can
 extend that time. Reset discards the current block.
 
