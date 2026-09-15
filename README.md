@@ -20,6 +20,11 @@ picoseconds: a positive integer, default `2000` (2 ns, 500 MHz). Changing it can
 change pipeline latency. It does not affect combinational targets and is not a
 physical timing guarantee.
 
+`CRC_CLOCK_MARGIN_PERCENT` reserves an integer percentage of that period for
+XLS pipeline scheduling (default `0`, valid range `0` through `99`). It changes
+the generated pipeline only; ORFS still constrains the physical clock with
+`CRC_CLOCK_PERIOD_PS`.
+
 Generated IR, SystemVerilog, and module signatures are under `build/crc/`.
 Configure with `-DBUILD_TESTING=OFF` to build without simulation tests.
 

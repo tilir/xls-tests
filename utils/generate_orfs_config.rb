@@ -18,8 +18,10 @@ output = File.expand_path(options[:output])
 rtl = File.expand_path(options[:rtl])
 abort "RTL not found: #{rtl}" unless File.file?(rtl)
 FileUtils.mkdir_p(output)
-period_ns = format('%.3f', options[:period_ps] / 1000.0)
-File.write(File.join(output, 'constraint.sdc'), "create_clock -name clk -period #{period_ns} [get_ports clk]\n")
+# ORFS reads its ASAP7 SDC time values in picoseconds. Keep the repository's
+# picosecond API unchanged instead of converting to ns.
+File.write(File.join(output, 'constraint.sdc'),
+           "create_clock -name clk -period #{options[:period_ps]} [get_ports clk]\n")
 File.write(File.join(output, 'config.mk'), <<~CONFIG)
   export PLATFORM = asap7
   export DESIGN_NAME = #{options[:top]}

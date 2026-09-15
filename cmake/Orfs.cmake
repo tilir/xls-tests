@@ -17,7 +17,9 @@ function(orfs_add_pnr name)
   add_custom_command(OUTPUT "${result}"
     COMMAND "${RUBY_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/utils/generate_orfs_config.rb"
       --output "${run_dir}" --rtl "${rtl}" --top "${ORFS_TOP}" --period-ps "${ORFS_CLOCK_PERIOD_PS}"
-    COMMAND "${CMAKE_MAKE_PROGRAM}" -C "${ORFS_ROOT}/flow"
+    # ORFS final reporting optionally invokes OpenROAD's GUI to render images.
+    # Force headless operation so an inherited stale DISPLAY cannot abort P&R.
+    COMMAND "${CMAKE_COMMAND}" -E env "DISPLAY=" "${CMAKE_MAKE_PROGRAM}" -j1 -C "${ORFS_ROOT}/flow"
       "DESIGN_CONFIG=${run_dir}/config.mk" "WORK_HOME=${run_dir}" all
     DEPENDS "${rtl}" "${CMAKE_SOURCE_DIR}/utils/generate_orfs_config.rb"
     COMMENT "Place and route ${name} with ORFS ASAP7" VERBATIM)

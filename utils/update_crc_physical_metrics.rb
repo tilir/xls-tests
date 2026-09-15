@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # Adds final-stage ORFS metrics to the CRC analysis CSV.
 require 'csv'
+require 'digest'
 require 'json'
 
 csv_path = ARGV.fetch(0, 'reports/sep-15-2026/crc_metrics.csv')
@@ -8,6 +9,7 @@ orfs_root = ARGV.fetch(1, 'build1000/crc/openroad')
 
 columns = %w[
   physical_flow physical_platform physical_corner physical_target_period_ps
+  xls_clock_margin_percent physical_rtl_sha256 physical_result_dir
   physical_instances physical_stdcell_area_um2 physical_utilization
   physical_setup_wns_ps physical_setup_tns_ps physical_setup_violations
   physical_flow_errors physical_status
@@ -17,11 +19,15 @@ metrics = Dir.glob(File.join(orfs_root, '*', 'logs', 'asap7', '*', 'base',
                              '6_report.json')).each_with_object({}) do |path, result|
   report = JSON.parse(File.read(path))
   target = path.split('/')[3]
+  rtl = File.join(File.dirname(orfs_root), "#{target}.sv")
   result[target] = {
     'physical_flow' => 'ORFS',
     'physical_platform' => 'ASAP7',
     'physical_corner' => 'BC / NLDM',
     'physical_target_period_ps' => '1000',
+    'xls_clock_margin_percent' => '0',
+    'physical_rtl_sha256' => File.file?(rtl) ? Digest::SHA256.file(rtl).hexdigest : nil,
+    'physical_result_dir' => File.join(orfs_root, target),
     'physical_instances' => report.fetch('finish__design__instance__count').to_s,
     'physical_stdcell_area_um2' => report.fetch('finish__design__instance__area__stdcell').to_s,
     'physical_utilization' => report.fetch('finish__design__instance__utilization').to_s,

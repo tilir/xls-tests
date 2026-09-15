@@ -3,6 +3,13 @@ set(CRC_CLOCK_PERIOD_PS "2000" CACHE STRING "CRC pipeline clock period in picose
 if(NOT CRC_CLOCK_PERIOD_PS MATCHES "^[1-9][0-9]*$")
   message(FATAL_ERROR "CRC_CLOCK_PERIOD_PS must be a positive integer (picoseconds)")
 endif()
+set(CRC_CLOCK_MARGIN_PERCENT "0" CACHE STRING
+  "XLS scheduling clock margin for CRC pipelines (integer percent, 0 through 99)")
+if(NOT CRC_CLOCK_MARGIN_PERCENT MATCHES "^[0-9]+$" OR
+   CRC_CLOCK_MARGIN_PERCENT GREATER_EQUAL 100)
+  message(FATAL_ERROR
+    "CRC_CLOCK_MARGIN_PERCENT must be an integer from 0 through 99")
+endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/Targets.cmake")
 
 # Functions: each registration owns RTL, synthesis, and tests for both generators.

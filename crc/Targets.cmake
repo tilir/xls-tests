@@ -4,7 +4,8 @@ include_guard(DIRECTORY)
 function(_crc_add_variant target source top generator)
   set(timing_args)
   if(generator STREQUAL "pipeline")
-    list(APPEND timing_args CLOCK_PERIOD_PS "${CRC_CLOCK_PERIOD_PS}" DELAY_MODEL asap7)
+    list(APPEND timing_args CLOCK_PERIOD_PS "${CRC_CLOCK_PERIOD_PS}" DELAY_MODEL asap7
+      CODEGEN_ARGS "--clock_margin_percent=${CRC_CLOCK_MARGIN_PERCENT}")
   endif()
   xls_add_dslx(${target}
     SOURCE "${source}" TOP "${top}" GENERATOR "${generator}"

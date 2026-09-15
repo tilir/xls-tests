@@ -6,7 +6,7 @@ Seven RTL modules were generated from four DSLX sources. The examples expose thr
 
 XLS lowered the DSLX, eliminated unused folded state, generated ready/valid control, and scheduled pipeline registers from the target period. It did not transform the naive 128-bit recurrence into the shallow global XOR DAG written in crc_optimized.x: the naive combinational RTL still contains 128 feedback values and has generic depth 34, while the explicit DAG has depth 10.
 
-Generic Yosys `synth -flatten` provides cell counts and structural netlists, but no technology mapping or static timing. A separate completed ORFS ASAP7 place-and-route run now supplies physical metrics for the four clocked implementations at 1000 ps. It did not close setup timing, so these are implementation measurements rather than 1 GHz design points.
+Generic Yosys `synth -flatten` provides cell counts and structural netlists, but no technology mapping or static timing. A separate completed ORFS ASAP7 place-and-route run supplies physical metrics for the four clocked implementations at a real 1000 ps constraint. All four close setup timing.
 
 ## Artifacts and method
 
@@ -92,16 +92,24 @@ The Yosys scripts read Verilog, run hierarchy and synth -flatten, then write sta
 
 ## ORFS ASAP7 physical implementation at 1 GHz
 
-The four clocked RTL modules were placed and routed with OpenROAD-flow-scripts (ORFS) in `build1000`, using its ASAP7 platform at the default BC/NLDM corner. Each run constrained `clk` to 1000 ps, used a 60% requested core utilization, completed all flow stages, and emitted final netlists, DEF, GDS, SPEF, and STA reports under `build1000/crc/openroad/<target>/`. The final reports record zero flow errors, but all four have negative setup WNS; none is timing-closed at 1 GHz.
+The four clocked RTL modules were placed and routed with OpenROAD-flow-scripts (ORFS) in `build1000`, using its ASAP7 platform at the default BC/NLDM corner. Each run constrained `clk` to 1000 ps, used a 60% requested core utilization, completed all flow stages, and emitted final netlists, DEF, GDS, SPEF, and STA reports under `build1000/crc/openroad/<target>/`. The final reports record zero flow errors and zero setup violations.
+
+An earlier wrapper converted the repository's 1000 ps setting to SDC `-period 1.000`. ORFS interprets that value in picoseconds, so it was a 1 ps constraint rather than 1 ns; its negative-slack results are invalid and have been replaced. The fixed wrapper writes `create_clock -period 1000` and launches ORFS headlessly and serially.
 
 | Module | Mapped instances | Std-cell area (µm²) | Utilization | Setup WNS (ps) | Setup TNS (ps) | Setup violations | Inferred critical period (ps) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `crc16` temporal proc | 309 | 18.327 | 82.16% | -154.236 | -2,287.220 | 16 | 1,154.236 |
-| `crc16_folded_128` | 1,864 | 135.477 | 79.34% | -279.003 | -33,047.500 | 131 | 1,279.003 |
-| `crc16_naive_128_pipeline` | 3,199 | 238.718 | 72.09% | -281.552 | -22,071.200 | 196 | 1,281.552 |
-| `crc16_optimized_128_pipeline` | 2,217 | 166.066 | 75.03% | -242.868 | -3,817.240 | 16 | 1,242.868 |
+| `crc16` temporal proc | 274 | 16.461 | 73.79% | +838.248 | 0 | 0 | 161.752 |
+| `crc16_folded_128` | 1,825 | 122.428 | 71.70% | +569.168 | 0 | 0 | 430.832 |
+| `crc16_naive_128_pipeline` | 3,076 | 225.596 | 68.12% | +706.338 | 0 | 0 | 293.662 |
+| `crc16_optimized_128_pipeline` | 2,080 | 154.431 | 69.78% | +746.235 | 0 | 0 | 253.765 |
 
-The inferred critical period is `1000 ps - WNS`; it is included only as a direct reading aid for the 1 GHz constraint, not as a separately reported STA metric. The optimized 128-bit pipeline is smaller and has fewer setup violations than the naive pipeline in this implementation, but still misses the target by 243 ps. The temporal byte engine is smallest and closest to closure, missing by 154 ps. ORFS's `finish__timing__fmax` field is inconsistent with the final WNS values, so it is deliberately omitted rather than interpreted as achieved frequency.
+The inferred critical period is `1000 ps - WNS`; it is included only as a direct reading aid for the 1 GHz constraint, not as a separately reported STA metric. The temporal byte engine is smallest and has the largest margin. The optimized 128-bit pipeline is 31.5% smaller than the naive one and has 39.9 ps more slack. ORFS's `finish__timing__fmax` field is inconsistent with the final WNS values, so it is deliberately omitted rather than interpreted as achieved frequency.
+
+The worst paths are all register-to-register logic paths, not unbounded I/O paths. Temporal goes from CRC state bit 12 to state bit 5 through XOR/XNOR and final-state control (181.80 ps data arrival): its byte CRC/state update dominates. Folded goes from countdown state bit 1 to data state bit 6 through the step-completion compare/control and CRC-side logic (484.41 ps): state/control fanout dominates this worst path. Naive goes from `p0_feedback` to `p1_feedback` through the recursive XOR/XNOR feedback chain (355.99 ps), so it is CRC datapath. Optimized goes from an input pipeline register to the output register through its shared XOR DAG (308.06 ps), also CRC datapath.
+
+### Closure conclusion
+
+At the corrected physical target, every baseline already meets the prompt's closure criterion (`WNS >= 0`) with more than 500 ps margin. Therefore no compiler margin, extra pipeline registers, or DSLX sibling architecture is justified for a 1 GHz result: those changes would worsen area or latency without solving a real timing failure. `CRC_CLOCK_MARGIN_PERCENT` is available for a future tighter-target scheduling sweep and is passed only to XLS pipeline codegen; its default is 0. The attempted margin sweep is not reported as a physical tradeoff because its ORFS runs preceded the SDC-unit correction.
 
 These ORFS runs are downstream physical implementations, not the XLS Bazel `place_and_route` rule described in AGENTS.md. Combinational function modules were not placed and routed because they have no clocked top-level wrapper or defined I/O timing constraints in this experiment.
 
@@ -115,4 +123,4 @@ For pure full-block forms, utils/compare_crc_netlists.rb propagates affine GF(2)
 
 This is evidence for a division of labor, not automatic architectural optimality. The designer chose the interface, state placement, temporal/spatial factor, folding factor, and algebraic graph. Those choices dominate the visible throughput/latency/logic tradeoffs. The naive and optimized forms compute the same transformation, but one favors generic cell count and the other depth.
 
-XLS made alternatives inexpensive to express and evaluate: it lowered the CRC recurrence, removed provably constant folded state, generated channel protocol logic, scheduled one source function differently for two target periods, and inserted only live pipeline state at the corresponding cuts. It did not infer the manually supplied shallow global XOR DAG from the naive recurrence in these generated artifacts. Technology mapping and STA are the next required step before any PPA or frequency claim.
+XLS made alternatives inexpensive to express and evaluate: it lowered the CRC recurrence, removed provably constant folded state, generated channel protocol logic, scheduled one source function differently for two target periods, and inserted only live pipeline state at the corresponding cuts. It did not infer the manually supplied shallow global XOR DAG from the naive recurrence in these generated artifacts. ORFS technology mapping, placement, routing, and STA confirm that the baseline pipelines close at the corrected 1 GHz constraint; a tighter-frequency study is the next useful timing experiment.
