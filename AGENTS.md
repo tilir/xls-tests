@@ -226,3 +226,78 @@ add_yosys_synth(crc16_handwritten
   TOP crc16_handwritten
   SOURCES crc16_handwritten.sv)
 ```
+
+## Native XLS OpenROAD / ASAP7 path
+
+This repository does not currently register the native XLS OpenROAD path:
+the CRC synth_* targets above run only generic Yosys. DELAY_MODEL asap7 in XLS
+codegen is a scheduling estimator selection, not an OpenROAD run.
+
+Relevant sources in the checked-out XLS tree are:
+
+| Purpose | Source / target |
+| --- | --- |
+| gRPC adapter that invokes a metrics command | /home/tilir/xls/xls/synthesis/openroad/json_metrics_server_main.cc; //xls/synthesis/openroad:json_metrics_server_main |
+| adapter build declaration and dummy contract test | /home/tilir/xls/xls/synthesis/openroad/BUILD; //xls/synthesis/openroad:dummy_metrics_main, //xls/synthesis/openroad:json_metrics_server_test |
+| stage-aware OpenSTA script | /home/tilir/xls/xls/synthesis/openroad/sta_by_stage.tcl; label //xls/synthesis/openroad:sta_by_stage.tcl |
+| gRPC client and response schema | /home/tilir/xls/xls/synthesis/synthesis_client_main.cc; //xls/synthesis:synthesis_client_main; /home/tilir/xls/xls/synthesis/synthesis.proto |
+| example ASAP7 synthesis rule | //xls/examples:find_index_5000ps_model_unit_verilog_synth_asap7 |
+
+The Bazel hardware-flow rules are supplied by @rules_hdl: synthesize_rtl
+performs technology-cell synthesis, and run_opensta runs timing analysis.
+XLS examples load them from @rules_hdl//synthesis:build_defs.bzl and
+@rules_hdl//static_timing:build_defs.bzl. The example target above selects
+@org_theopenroadproject_asap7sc7p5t_27//:asap7-sc7p5t_rev27_rvt; XLS's
+default asap7 delay-model mapping selects the related
+...:asap7-sc7p5t_rev27_rvt_4x standard-cell target. Choose the exact
+standard-cell target and corner deliberately; they are runtime design data,
+not a property inferred from the string asap7.
+
+The runnable native path requires OpenROAD/OpenSTA, Yosys and ABC runtime
+files, the OpenSTA Tcl runtime, and the selected standard-cell platform data:
+at minimum its Liberty file, plus every additional Liberty needed for the
+corner or multi-Vt design. A place-and-route flow additionally needs the
+platform LEF/tech LEF, RC data, and floorplan constraints. The local
+/home/tilir/xls/dependency_support/openroad directory alone is not this
+runtime installation.
+
+For the JSON metrics server, the client supplies generated RTL as the
+positional Verilog input, --top=<module>, and --ghz=<frequency>. The server
+converts frequency to a period and invokes its metrics command with:
+
+| Input or output | Environment variable |
+| --- | --- |
+| generated RTL path | INPUT_RTL |
+| top module | CONSTANT_TOP |
+| clock port / target period in ps | CONSTANT_CLOCK_PORT=clk / CONSTANT_CLOCK_PERIOD_PS |
+| synthesized netlist path | OUTPUT_NETLIST |
+| metrics JSON path | OUTPUT_METRICS |
+
+The server creates these paths in a temporary directory; --save_temps
+preserves it for inspection. It does not accept a stable output-directory
+flag. Bazel rules instead publish their declared netlist, report, and other
+outputs under Bazel's output tree. A standalone wrapper should create its own
+run directory and pass the six environment variables to the metrics command.
+
+The adapter requires JSON slack_ps and exposes it through the XLS synthesis
+RPC. Its current implementation does not copy arbitrary JSON area, power,
+cell-count, or path fields into the response, even though synthesis.proto has
+fields for area, sequential area, power, instance counts, failing paths,
+netlist, maximum frequency, and place-and-route result. The exported
+sta_by_stage.tcl reports units, the longest unconstrained path for the full
+design and each pipeline stage, and path details including slew, capacitance,
+input nets, and fanout. It is an STA report, not placement/routing PPA.
+
+The native `place_and_route` rule is a separate and richer path than that
+JSON adapter. It was verified with
+`//xls/examples:find_index_place_and_route_asap7`: its generated command file
+uses the rev27 ASAP7 1x technology LEF, the rev27 1x cell LEF, and
+`asap7-sc7p5t_rev27_rvt-ccs_ss_SS.lib`. It creates a 7 by 7 micrometre die
+with a 1 micrometre core padding, 0.95 placement density, 0.2 micrometre pin
+spacing, clock period 325 ps, CTS, global routing on M2--M7, and detailed
+routing. The resulting PPA textproto records cell-area partitions and counts,
+utilization, target period, critical-path delay, Fmax, setup WNS/TNS, and
+power using 0.5 probabilistic switching. Its action also emits stage logs and
+ODBs, routed DEF, a DRC report, and OpenSTA timing reports. These values are
+available only after successful P&R; do not substitute JSON-adapter slack for
+the complete PPA result.
