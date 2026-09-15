@@ -6,14 +6,14 @@ endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/Targets.cmake")
 
 # Functions: each registration owns RTL, synthesis, and tests for both generators.
-crc_add_function(crc16_naive_128 crc_naive_128.x crc16_block WIDTH 128)
-crc_add_function(crc16_optimized_128 crc_optimized_128.x crc16_block WIDTH 128)
+crc_add_function(crc16_naive_128 crc_naive.x crc16_block WIDTH 128)
+crc_add_function(crc16_optimized_128 crc_optimized.x crc16_block WIDTH 128)
 
 # Procs require pipeline generation; temporal also exposes a pure transition.
 crc_add_proc(crc16 crc_temporal.x Crc16)
 crc_add_function(crc16_temporal crc_temporal.x crc16_tick
   WIDTH 8 KIND tick GENERATORS combinational)
-crc_add_proc(crc16_folded_128 crc_folded_128.x Crc16Folded128)
+crc_add_proc(crc16_folded_128 crc_folded.x Crc16Folded128)
 
 # Historical public names retained for existing build commands.
 crc_alias(crc16_temporal_pipeline crc16)

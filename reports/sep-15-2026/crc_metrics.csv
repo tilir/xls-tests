@@ -1,0 +1,15 @@
+build,target,source,entry_point,generator,interface,stateful,bits_per_step,block_ii_cycles,signature_latency,xls_stage_labels,compute_intervals,internal_cuts_bits,rtl_register_bits,yosys_cells,yosys_seq_cells,yosys_comb_cells,xor_cells,xnor_cells,rtl_caret_ops,generic_max_gate_depth,target_clock_ps,timing_report
+1000,crc16_naive_128_combinational,crc_naive.x,crc16_block,combinational,call,No,128,N/A,N/A,N/A,1,None,0,385,0,385,67,317,384,34,N/A,none
+2000,crc16_naive_128_combinational,crc_naive.x,crc16_block,combinational,call,No,128,N/A,N/A,N/A,1,None,0,385,0,385,67,317,384,34,N/A,none
+1000,crc16_naive_128_pipeline,crc_naive.x,crc16_block,pipeline,call,No,128,1,5,0-4,4,100;60;20,340,730,340,390,60,324,N/A,N/A,1000,none
+2000,crc16_naive_128_pipeline,crc_naive.x,crc16_block,pipeline,call,No,128,1,3,0-2,2,57,217,604,217,387,63,321,N/A,N/A,2000,none
+1000,crc16_optimized_128_combinational,crc_optimized.x,crc16_block,combinational,call,No,128,N/A,N/A,N/A,1,None,0,438,0,438,62,376,438,10,N/A,none
+2000,crc16_optimized_128_combinational,crc_optimized.x,crc16_block,combinational,call,No,128,N/A,N/A,N/A,1,None,0,438,0,438,62,376,438,10,N/A,none
+1000,crc16_optimized_128_pipeline,crc_optimized.x,crc16_block,pipeline,call,No,128,1,2,0-1,1,None,160,598,160,438,62,376,438,N/A,1000,none
+2000,crc16_optimized_128_pipeline,crc_optimized.x,crc16_block,pipeline,call,No,128,1,2,0-1,1,None,160,598,160,438,62,376,438,N/A,2000,none
+1000,crc16_folded_128,crc_folded.x,Crc16Folded128,pipeline,ready-valid,Yes,16,8,0,N/A,8,proc-state,131,355,131,224,15,43,48,8,1000,none
+2000,crc16_folded_128,crc_folded.x,Crc16Folded128,pipeline,ready-valid,Yes,16,8,0,N/A,8,proc-state,131,355,131,224,15,43,48,8,2000,none
+1000,crc16,crc_temporal.x,Crc16,pipeline,ready-valid,Yes,8,16,0,N/A,16,16,16,60,16,44,10,14,24,3,1000,none
+2000,crc16,crc_temporal.x,Crc16,pipeline,ready-valid,Yes,8,16,0,N/A,16,16,16,60,16,44,10,14,24,3,2000,none
+1000,crc16_temporal_combinational,crc_temporal.x,crc16_tick,combinational,call,No,8,N/A,N/A,N/A,1,None,0,42,0,42,9,15,24,4,N/A,none
+2000,crc16_temporal_combinational,crc_temporal.x,crc16_tick,combinational,call,No,8,N/A,N/A,N/A,1,None,0,42,0,42,9,15,24,4,N/A,none

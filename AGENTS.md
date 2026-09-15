@@ -5,6 +5,9 @@ Put implementation notes, development workflows, validation history, and
 experimental measurements here. Update these notes when the implementation
 changes; do not present old measurements as current guarantees.
 
+Place generated analysis deliverables, metrics, plots, and slide facts under
+`reports/<date>/`; for this study use `reports/sep-15-2026/`.
+
 Use Ruby for repository utilities. Keep the naive 128-bit DSLX implementation
 self-contained: one function, one bit loop, no imports. Preserve existing public
 build target names when reorganizing the build.
@@ -17,16 +20,17 @@ list of registrations and configuration; shared CRC rules live in
 crc/Targets.cmake. Register RTL, synthesis, and tests together.
 
 ```cmake
-crc_add_function(crc16_naive_128 crc_naive_128.x crc16_block WIDTH 128)
-crc_add_proc(crc16_folded_128 crc_folded_128.x Crc16Folded128)
+crc_add_function(crc16_naive_128 crc_naive.x crc16_block WIDTH 128)
+crc_add_proc(crc16_folded_128 crc_folded.x Crc16Folded128)
 ```
 
 `crc_add_function` creates pipeline and combinational variants, their `synth_`
 targets, and `<target>_test_sim` targets. `GENERATORS` restricts variants;
 `KIND tick` selects the temporal transition's tuple output contract.
-`crc_add_proc` creates pipeline RTL and uses `<name>_testbench.sv` with a generated
-channel wrapper. Stateful procs cannot be lowered directly by the combinational
-generator; the temporal combinational variant exposes a transition function.
+`crc_add_proc` creates pipeline RTL and uses
+`testbenches/crc/<name>_testbench.sv` with a generated channel wrapper. Stateful
+procs cannot be lowered directly by the combinational generator; the temporal
+combinational variant exposes a transition function.
 
 Compatibility aliases are explicit at the end of crc/CMakeLists.txt. These
 include `crc16_temporal_pipeline`, `synth_crc16_temporal_pipeline`, and old
@@ -59,13 +63,13 @@ additional implementations.
 
 | DSLX source | Entry point | Generator | Build target / RTL module | Result |
 | --- | --- | --- | --- | --- |
-| `crc_naive_128.x` | `fn crc16_block` | `pipeline` | `crc16_naive_128_pipeline` | Pipelined 128-bit update from the naive loop |
-| `crc_naive_128.x` | `fn crc16_block` | `combinational` | `crc16_naive_128_combinational` | Entire 128-bit update without registers |
-| `crc_optimized_128.x` | `fn crc16_block` | `pipeline` | `crc16_optimized_128_pipeline` | Pipelined 128-bit update from the shared XOR network |
-| `crc_optimized_128.x` | `fn crc16_block` | `combinational` | `crc16_optimized_128_combinational` | Shared 128-bit XOR network without registers |
+| `crc_naive.x` | `fn crc16_block` | `pipeline` | `crc16_naive_128_pipeline` | Pipelined 128-bit update from the naive loop |
+| `crc_naive.x` | `fn crc16_block` | `combinational` | `crc16_naive_128_combinational` | Entire 128-bit update without registers |
+| `crc_optimized.x` | `fn crc16_block` | `pipeline` | `crc16_optimized_128_pipeline` | Pipelined 128-bit update from the shared XOR network |
+| `crc_optimized.x` | `fn crc16_block` | `combinational` | `crc16_optimized_128_combinational` | Shared 128-bit XOR network without registers |
 | `crc_temporal.x` | `proc Crc16` | `pipeline` | `crc16` | Byte-stream channels, internal CRC accumulator, result and accumulator clear on `last` |
 | `crc_temporal.x` | `fn crc16_tick` | `combinational` | `crc16_temporal_combinational` | `(crc, byte_input) -> (next_crc, output_crc, output_valid)`; caller owns state and handshake |
-| `crc_folded_128.x` | `proc Crc16Folded128` | `pipeline` | `crc16_folded_128` | Channels accept initial CRC and 128-bit block; internal state processes 16 bits per step, then emits CRC |
+| `crc_folded.x` | `proc Crc16Folded128` | `pipeline` | `crc16_folded_128` | Channels accept initial CRC and 128-bit block; internal state processes 16 bits per step, then emits CRC |
 
 For every canonical target `T` in the table:
 
@@ -106,7 +110,9 @@ variant and no pipeline variant of `crc16_tick` in the current registrations.
 
 ## Tests
 
-Function variants share crc/crc_function_testbench.sv.in.
+Function variants share testbenches/crc/crc_function_testbench.sv.in. Keep all
+CRC simulation sources in testbenches/crc/, separate from the DSLX examples in
+crc/.
 utils/generate_crc_function_test.rb validates ports and reads pipeline latency
 from the generated signature. Do not hardcode pipeline latency in testbenches.
 The shared test issues an input every cycle, checks basis vectors, random inputs
@@ -159,7 +165,7 @@ and 64, and rejected 0, 3, 128, and 256 at compile time.
 
 ## XOR network generation and equivalence
 
-crc/crc_optimized_128.x is generated; do not edit it manually. Regenerate with:
+crc/crc_optimized.x is generated; do not edit it manually. Regenerate with:
 
 ```sh
 ruby utils/generate_crc128.rb

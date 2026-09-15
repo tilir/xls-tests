@@ -59,5 +59,5 @@ state.each_with_index do |terms, bit|
 end
 lines << '  ' + 15.downto(0).map { |i| "out#{i}" }.join(' ++ ')
 lines << '}'
-output = File.expand_path('../crc/crc_optimized_128.x', __dir__)
+output = File.expand_path('../crc/crc_optimized.x', __dir__)
 File.write(output, lines.join("\n") + "\n")

@@ -32,7 +32,8 @@ function(crc_add_function name source top)
       get_property(signature TARGET ${target} PROPERTY XLS_SIGNATURE_OUTPUT)
       set(testbench "${CMAKE_CURRENT_BINARY_DIR}/${target}_testbench.sv")
       set(script "${CMAKE_SOURCE_DIR}/utils/generate_crc_function_test.rb")
-      set(template "${CMAKE_CURRENT_SOURCE_DIR}/crc_function_testbench.sv.in")
+      set(template
+        "${CMAKE_SOURCE_DIR}/testbenches/crc/crc_function_testbench.sv.in")
       add_custom_command(
         OUTPUT "${testbench}"
         COMMAND "${RUBY_EXECUTABLE}" "${script}"
@@ -59,7 +60,7 @@ function(crc_add_proc name source top)
       SOURCES
         "${CMAKE_SOURCE_DIR}/utils/tb_util.sv"
         "${CMAKE_SOURCE_DIR}/utils/tb_watchdog.sv"
-        "${name}_testbench.sv")
+        "${CMAKE_SOURCE_DIR}/testbenches/crc/${name}_testbench.sv")
   endif()
 endfunction()
 
