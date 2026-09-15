@@ -227,7 +227,41 @@ add_yosys_synth(crc16_handwritten
   SOURCES crc16_handwritten.sv)
 ```
 
-## Native XLS OpenROAD / ASAP7 path
+## ORFS physical flow and native XLS OpenROAD / ASAP7 path
+
+The CRC experiment registers an optional downstream ORFS physical flow. Its
+implementation is `cmake/Orfs.cmake`; it writes a per-run `config.mk` and SDC
+through `utils/generate_orfs_config.rb`. `ORFS_ROOT` is a CMake cache path and
+defaults to `$HOME/OpenROAD-flow-scripts`, but must be set explicitly for any
+other checkout. If `<ORFS_ROOT>/flow/Makefile` is absent, no `openroad_*`
+targets are registered.
+
+`openroad` builds all four clocked modules; the individual targets are
+`openroad_crc16`, `openroad_crc16_folded_128`,
+`openroad_crc16_naive_128_pipeline`, and
+`openroad_crc16_optimized_128_pipeline`. They depend on the corresponding XLS
+RTL target and call ORFS with `PLATFORM=asap7`, generated RTL and top module,
+and an SDC whose `clk` period is `CRC_CLOCK_PERIOD_PS`. Results are below
+`build/crc/openroad/<target>/`; final metrics are in
+`logs/asap7/<target>/base/6_report.json`, and the routed Verilog, DEF, GDS,
+ODB, SPEF, and reports are below `results/` and `reports/`. Combinational
+function modules have no ORFS target because the experiment has no clocked
+wrapper or I/O timing contract for them.
+
+The 1000 ps runs used the installed ORFS ASAP7 platform's BC/NLDM default,
+ASAP7 rev28 1x technology and RVT cell LEFs, a requested core utilization of
+60%, and no I/O delay constraints. All four flows completed with zero flow
+errors, but setup timing failed: `crc16` WNS -154.236 ps,
+`crc16_folded_128` -279.003 ps, `crc16_naive_128_pipeline` -281.552 ps, and
+`crc16_optimized_128_pipeline` -242.868 ps. Treat those as failed 1 GHz
+implementations; their full physical data is recorded in
+`reports/sep-15-2026/crc_analysis.md` and `crc_metrics.csv`. Do not use the
+ORFS `finish__timing__fmax` field for this comparison: it conflicts with the
+reported final WNS values.
+
+The ORFS path is separate from the native XLS Bazel OpenROAD path below. It is
+the repository's runnable physical implementation flow for the CRC targets;
+it does not modify or invoke Bazel in the XLS checkout.
 
 This repository does not currently register the native XLS OpenROAD path:
 the CRC synth_* targets above run only generic Yosys. DELAY_MODEL asap7 in XLS

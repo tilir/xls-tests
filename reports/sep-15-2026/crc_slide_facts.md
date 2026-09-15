@@ -8,3 +8,4 @@
 - The temporal stream has 16 persistent CRC cells and 44 combinational cells, and accepts one byte per cycle when flow control permits. A 128-bit packet is 16 accepted byte transactions.
 - Stream and folded results have different interface shapes and state placement; their 60-versus-355 generic-cell totals are not a direct quality ranking.
 - Values come from generic Yosys `synth -flatten`, with no technology library, STA, area, slack, critical-delay, or achieved-Fmax result.
+- ORFS ASAP7 P&R at a 1000 ps clock completed for all four clocked modules but closed none: temporal WNS -154 ps, folded -279 ps, naive 128-bit pipeline -282 ps, and optimized 128-bit pipeline -243 ps. The temporal engine is smallest (18.327 µm² standard-cell area); optimized is smaller than naive (166.066 versus 238.718 µm²).

@@ -10,6 +10,10 @@ function(_crc_add_variant target source top generator)
     SOURCE "${source}" TOP "${top}" GENERATOR "${generator}"
     ${timing_args} CODEGEN_ARGS "--module_name=${target}")
   add_yosys_synth(${target} RTL_TARGET ${target} TOP ${target})
+  if(generator STREQUAL "pipeline")
+    orfs_add_pnr(${target} RTL_TARGET ${target} TOP ${target}
+      CLOCK_PERIOD_PS "${CRC_CLOCK_PERIOD_PS}")
+  endif()
 endfunction()
 
 # Pure functions: both generators by default, each with a signature-driven test.

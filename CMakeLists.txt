@@ -12,6 +12,7 @@ include(Xls)
 include(CTest)
 include(SvTest)
 include(YosysSynth)
+include(Orfs)
 
 if(BUILD_TESTING)
   add_custom_target(check

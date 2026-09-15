@@ -23,6 +23,25 @@ physical timing guarantee.
 Generated IR, SystemVerilog, and module signatures are under `build/crc/`.
 Configure with `-DBUILD_TESTING=OFF` to build without simulation tests.
 
+## Physical synthesis
+
+Optional ORFS physical targets place and route the four clocked CRC modules
+with an OpenROAD-flow-scripts checkout and its ASAP7 platform. The default is
+`$HOME/OpenROAD-flow-scripts`; set `ORFS_ROOT` when it lives elsewhere:
+
+```sh
+cmake -S . -B build -DXLS_ROOT=/path/to/xls \
+  -DORFS_ROOT=/path/to/OpenROAD-flow-scripts
+cmake --build build --target openroad
+```
+
+Build one target with `openroad_crc16_naive_128_pipeline`. The available
+targets are `openroad_crc16`, `openroad_crc16_folded_128`, and the two
+`openroad_crc16_{naive,optimized}_128_pipeline` targets. Artifacts, reports,
+and routed results are written below `build/crc/openroad/<target>/`. These
+targets use `CRC_CLOCK_PERIOD_PS` as the clock constraint; inspect final STA
+reports for timing closure.
+
 ## CRC targets
 
 | Target | Operation |
