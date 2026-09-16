@@ -101,3 +101,24 @@ cmake --build build --target synth_crc16_naive_128_pipeline
 ```
 
 Netlists, logs, and statistics are under `build/crc/synth/<target>/`.
+
+## DSLX formal-verification lesson
+
+[`formal/crc_formal.x`](formal/crc_formal.x) is a standalone CRC16 lesson for
+unit tests, random and exhaustive QuickCheck, and symbolic SMT proofs. It does
+not create RTL, synthesis, or physical-design targets. Its top comment gives
+the XLS Bazel targets and commands for every mode, including an intentionally
+false property that reports a counterexample.
+
+After configuring with `XLS_ROOT`, run the passing lesson with:
+
+```sh
+cmake --build build --target formal_crc
+```
+
+`formal_crc_concrete` runs the selected unit test, 100 random QuickCheck cases,
+and the exhaustive 16-value `u4` property. The three
+`formal_crc_prop_crc16_*` targets prove the polynomial-reference, linearity,
+and 64+64 composition properties separately; `formal_crc` collects them.
+`formal_crc_false` is intentionally non-zero and prints the solver's
+counterexample. It is not a dependency of `formal_crc`.

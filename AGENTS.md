@@ -155,6 +155,31 @@ inside crc_temporal.x, while the standalone function experiments process full
 128-bit blocks. The shared function testbench still covers both block
 implementations and the temporal transition. There are seven RTL variants.
 
+`formal/crc_formal.x` is deliberately outside `crc/` and is not registered in
+CMake: it is a self-contained educational DSLX source, not an RTL experiment.
+It contains selected unit tests, sampled and exhaustive QuickCheck properties,
+three properties intended for `prove_quickcheck_main`, and one intentionally
+false property. Keep the false property out of normal passing commands by
+using the documented `--test_filter`. Do not describe sampled or exhaustive
+QuickCheck as SMT proof. The file's header is the user-facing command reference;
+when the XLS checkout changes, verify its `dslx_fmt`, `interpreter_main`, and
+`prove_quickcheck_main` labels and behavior before updating it.
+
+`formal/CMakeLists.txt` registers no RTL, synthesis, or physical targets.
+When the corresponding XLS binaries exist, `formal_crc_concrete` runs the unit
+test plus random and exhaustive QuickCheck through `interpreter_main
+--compare=jit`; the three `formal_crc_prop_*` targets run SMT proofs and
+`formal_crc` collects those passing actions. `formal_crc_false` deliberately
+fails and prints a counterexample, so never make it a dependency of `formal_crc`
+or `check`.
+
+Validation with the local XLS checkout: dslx_fmt left the source formatted;
+the concrete target passed the XMODEM `123456789` unit test, 100 random reverse
+checks, and all 16 exhaustive `u4` values. SMT proved the polynomial reference
+in about 10.7 seconds, linearity in 9.7 seconds, and 64+64 composition in 1.0
+second. The false initial-state property failed as intended with
+`counterexample: bits[16]:17027, bits[128]:0x0`.
+
 The folded proc uses STEP_BITS=16, processing eight chunks per block. Its
 initial CRC comes from the input transaction; it does not automatically carry
 the result between blocks. const_assert checks in config require STEP_BITS to
