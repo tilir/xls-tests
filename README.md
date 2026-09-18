@@ -122,3 +122,8 @@ and the exhaustive 16-value `u4` property. The three
 and 64+64 composition properties separately; `formal_crc` collects them.
 `formal_crc_false` is intentionally non-zero and prints the solver's
 counterexample. It is not a dependency of `formal_crc`.
+
+`formal_sha256_collision_hard` is a separate, intentionally infeasible
+counterexample search for an injectivity claim about fixed-IV SHA-256
+compression. It is neither a passing test nor a cryptographic security result;
+use an external timeout when experimenting with it.

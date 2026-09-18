@@ -44,3 +44,14 @@ add_custom_target(formal_crc_false
   DEPENDS "${formal_source}"
   COMMENT "Demonstrate a failing CRC SMT property (expected to fail)"
   VERBATIM)
+
+# Mathematically false by pigeonhole principle, but finding a counterexample
+# is intended to be computationally infeasible. Never add it to formal_crc.
+set(sha256_collision_source "${CMAKE_CURRENT_SOURCE_DIR}/sha256_collision_hard.x")
+add_custom_target(formal_sha256_collision_hard
+  COMMAND "${XLS_PROVE_QUICKCHECK}"
+    "--dslx_path=${XLS_ROOT}/xls/examples"
+    "--test_filter=prop_sha256_compression_is_injective" "${sha256_collision_source}"
+  DEPENDS "${sha256_collision_source}"
+  COMMENT "Attempt an infeasible SHA-256 compression collision proof"
+  VERBATIM)

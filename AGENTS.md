@@ -173,6 +173,14 @@ test plus random and exhaustive QuickCheck through `interpreter_main
 fails and prints a counterexample, so never make it a dependency of `formal_crc`
 or `check`.
 
+`formal/sha256_collision_hard.x` imports the XLS one-block SHA-256 compression
+implementation and asserts a false 512-bit-to-256-bit injectivity property.
+`formal_sha256_collision_hard` is intentionally excluded from all aggregate
+targets. A counterexample would be a fixed-IV compression-function collision;
+timeout or resource exhaustion is expected and is not cryptographic evidence.
+The local prover reached the property and remained unresolved for a 15-second
+bounded run; do not put an unbounded invocation in routine validation.
+
 Validation with the local XLS checkout: dslx_fmt left the source formatted;
 the concrete target passed the XMODEM `123456789` unit test, 100 random reverse
 checks, and all 16 exhaustive `u4` values. SMT proved the polynomial reference
