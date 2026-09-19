@@ -181,6 +181,20 @@ timeout or resource exhaustion is expected and is not cryptographic evidence.
 The local prover reached the property and remained unresolved for a 15-second
 bounded run; do not put an unbounded invocation in routine validation.
 
+`formal/mul_formal.x` is a separate, self-contained scaling example for an
+SMT proof: `mul_sa` constructs multiplication modulo `2^N` by shifting and
+conditionally adding, and `prop_comm` compares the two elaborated operand
+orders. The property is true, but it does not rely on the builtin `*` in the
+property and can become expensive as `N` grows. `N=10` is the checked-in
+demonstration value. `formal_mul_concrete` runs ordinary sampled QuickCheck;
+`formal_mul_prove` invokes `prove_quickcheck_main` with
+`--solver_num_threads=${FORMAL_MUL_SOLVER_THREADS}`. The cache variable is a
+positive integer and defaults to 1. Neither target is a dependency of
+`formal_crc`, `check`, or a CI target. Use an external timeout for the SMT
+target. A timeout means the solver did not finish in the allowed time; it is
+not evidence for or against the property. Before reporting timing comparisons,
+record the XLS/Z3 revision, `N`, solver threads, timeout, host, and peak memory.
+
 Validation with the local XLS checkout: dslx_fmt left the source formatted;
 the concrete target passed the XMODEM `123456789` unit test, 100 random reverse
 checks, and all 16 exhaustive `u4` values. SMT proved the polynomial reference

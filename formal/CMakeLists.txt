@@ -1,6 +1,7 @@
 # Standalone DSLX property/proof lesson. It deliberately has no RTL, Yosys,
 # or ORFS registration: the tools interpret and prove the source directly.
 set(formal_source "${CMAKE_CURRENT_SOURCE_DIR}/crc_formal.x")
+set(formal_mul_source "${CMAKE_CURRENT_SOURCE_DIR}/mul_formal.x")
 set(formal_tool_hint "${XLS_ROOT}/bazel-bin/xls/dslx")
 find_program(XLS_DSLX_INTERPRETER NAMES interpreter_main HINTS "${formal_tool_hint}")
 find_program(XLS_PROVE_QUICKCHECK NAMES prove_quickcheck_main HINTS "${formal_tool_hint}")
@@ -54,4 +55,28 @@ add_custom_target(formal_sha256_collision_hard
     "--test_filter=prop_sha256_compression_is_injective" "${sha256_collision_source}"
   DEPENDS "${sha256_collision_source}"
   COMMENT "Attempt an infeasible SHA-256 compression collision proof"
+  VERBATIM)
+
+# This is a scaling demonstration, not a routine test. It compares two
+# shift-and-add multiplier networks and is deliberately outside formal_crc.
+set(FORMAL_MUL_SOLVER_THREADS "1" CACHE STRING
+  "Z3 threads for the standalone shift-and-add multiplier proof")
+if(NOT FORMAL_MUL_SOLVER_THREADS MATCHES "^[1-9][0-9]*$")
+  message(FATAL_ERROR
+    "FORMAL_MUL_SOLVER_THREADS must be a positive integer, got: ${FORMAL_MUL_SOLVER_THREADS}")
+endif()
+
+add_custom_target(formal_mul_concrete
+  COMMAND "${XLS_DSLX_INTERPRETER}" --compare=jit
+    "--test_filter=prop_comm" "${formal_mul_source}"
+  DEPENDS "${formal_mul_source}"
+  COMMENT "Run concrete QuickCheck samples for shift-and-add multiplication"
+  VERBATIM)
+
+add_custom_target(formal_mul_prove
+  COMMAND "${XLS_PROVE_QUICKCHECK}"
+    "--solver_num_threads=${FORMAL_MUL_SOLVER_THREADS}"
+    "--test_filter=prop_comm" "${formal_mul_source}"
+  DEPENDS "${formal_mul_source}"
+  COMMENT "Prove shift-and-add multiplier commutativity with XLS SMT"
   VERBATIM)

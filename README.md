@@ -127,3 +127,17 @@ counterexample. It is not a dependency of `formal_crc`.
 counterexample search for an injectivity claim about fixed-IV SHA-256
 compression. It is neither a passing test nor a cryptographic security result;
 use an external timeout when experimenting with it.
+
+[`formal/mul_formal.x`](formal/mul_formal.x) is a standalone scaling example:
+it asks the SMT solver to prove commutativity of two shift-and-add multiplier
+networks. Run sampled concrete cases with `formal_mul_concrete`; run the
+optional proof explicitly, setting the Z3 threads configured in XLS:
+
+```sh
+cmake -S . -B build -DXLS_ROOT=/path/to/xls -DFORMAL_MUL_SOLVER_THREADS=8
+timeout 10m cmake --build build --target formal_mul_prove
+```
+
+The source uses `N=10`. Larger values make a qualitatively harder bit-vector
+formula; a timeout means only that the run did not complete within its budget.
+Neither multiplier target is part of `formal_crc` or `check`.
